@@ -23,8 +23,18 @@ spec:
           - /bin/sh
           - -c
           - |
+            echo "Waiting for mantis pod to be ready..."
+            while ! kubectl get pods -l app.kubernetes.io/name={{ include "sublime-rules-engine.name" . }}-mantis -o jsonpath='{.items[0].metadata.name}' > /dev/null 2>&1; do
+              echo "Mantis pod not found yet, waiting..."
+              sleep 5
+            done
             MANTIS_POD_NAME=$(kubectl get pods -l app.kubernetes.io/name={{ include "sublime-rules-engine.name" . }}-mantis -o jsonpath='{.items[0].metadata.name}')
-            kubectl logs $MANTIS_POD_NAME -f | grep -q "Non-blocking migrations are up to date"
+            echo "Mantis pod found: $MANTIS_POD_NAME. Waiting for migrations to complete..."
+            until kubectl logs $MANTIS_POD_NAME | grep -q "Non-blocking migrations are up to date"; do
+              echo "Migrations not complete yet, waiting..."
+              sleep 5
+            done
+            echo "Mantis migrations are complete. Starting bora-lite."
       containers:
       - name: bora-lite
         image: "{{ .Values.image.bora_lite }}"
