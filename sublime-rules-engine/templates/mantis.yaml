@@ -1,10 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "sublime-rules-engine.fullname" . }}-mantis
   labels:
     {{- include "sublime-rules-engine.labels" . | nindent 4 }}
 spec:
+  serviceName: {{ include "sublime-rules-engine.fullname" . }}-mantis
   replicas: 1
   selector:
     matchLabels:
@@ -17,44 +18,48 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       containers:
-      - name: mantis
-        image: "{{ .Values.image.mantis }}"
-        imagePullPolicy: IfNotPresent
-        envFrom:
-        - secretRef:
-            name: {{ include "sublime-rules-engine.fullname" . }}
-        env:
-        - name: POSTGRES_HOST
-          value: {{ include "sublime-rules-engine.fullname" . }}-postgres
-        - name: S3_HOST
-          value: {{ include "sublime-rules-engine.fullname" . }}-s3
-        - name: S3_BUCKET
-          value: {{ .Values.s3.bucket }}
-        - name: STRELKA_HOST
-          value: {{ include "sublime-rules-engine.fullname" . }}-strelka-frontend
-        - name: HYDRA_HOST
-          value: {{ include "sublime-rules-engine.fullname" . }}-hydra
-        - name: PERSISTENT_STORAGE
-          value: "/data"
-        volumeMounts:
-        - name: persistent-storage
-          mountPath: /data
-      volumes:
-        - name: persistent-storage
-          persistentVolumeClaim:
-            claimName: {{ include "sublime-rules-engine.fullname" . }}-persistent-storage
+        - name: mantis
+          image: "{{ .Values.image.mantis }}"
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: {{ include "sublime-rules-engine.fullname" . }}
+          env:
+            - name: POSTGRES_HOST
+              value: {{ include "sublime-rules-engine.fullname" . }}-postgres
+            - name: S3_HOST
+              value: {{ include "sublime-rules-engine.fullname" . }}-s3
+            - name: S3_BUCKET
+              value: email-screenshots
+            - name: STRELKA_HOST
+              value: {{ include "sublime-rules-engine.fullname" . }}-strelka-frontend
+            - name: HYDRA_HOST
+              value: {{ include "sublime-rules-engine.fullname" . }}-hydra
+            - name: PERSISTENT_STORAGE
+              value: /data
+          volumeMounts:
+            - name: persistent-storage
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: persistent-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "sublime-rules-engine.fullname" . }}
+  name: {{ include "sublime-rules-engine.fullname" . }}-mantis
   labels:
     {{- include "sublime-rules-engine.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: ClusterIP
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: 8000
+    - port: 8080
+      targetPort: 8080
       protocol: TCP
       name: http
   selector:

@@ -1,10 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "sublime-rules-engine.fullname" . }}-s3
   labels:
     {{- include "sublime-rules-engine.labels" . | nindent 4 }}
 spec:
+  serviceName: {{ include "sublime-rules-engine.fullname" . }}-s3
   replicas: 1
   selector:
     matchLabels:
@@ -42,10 +43,14 @@ spec:
           volumeMounts:
             - name: s3-storage
               mountPath: /data
-      volumes:
-        - name: s3-storage
-          persistentVolumeClaim:
-            claimName: {{ include "sublime-rules-engine.fullname" . }}-s3
+  volumeClaimTemplates:
+    - metadata:
+        name: s3-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ .Values.s3.storage }}
 ---
 apiVersion: v1
 kind: Service
@@ -66,17 +71,4 @@ spec:
       name: s3-console
   selector:
     app.kubernetes.io/name: {{ include "sublime-rules-engine.name" . }}-s3
-    app.kubernetes.io/instance: {{ .Release.Name }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ include "sublime-rules-engine.fullname" . }}-s3
-  labels:
-    {{- include "sublime-rules-engine.labels" . | nindent 4 }}
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: {{ .Values.s3.storage }} 
+    app.kubernetes.io/instance: {{ .Release.Name }} 

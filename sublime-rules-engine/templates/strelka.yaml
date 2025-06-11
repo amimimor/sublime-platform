@@ -94,7 +94,7 @@ spec:
       containers:
       - name: strelka-backend
         image: "{{ .Values.image.strelka_backend }}"
-        command: ["sleep", "infinity"]
+        command: ["/bin/sh", "-c", "trap : TERM INT; sleep infinity & wait"]
         envFrom:
         - secretRef:
             name: {{ include "sublime-rules-engine.fullname" . }}
@@ -102,14 +102,15 @@ spec:
         volumeMounts:
         - name: config-volume
           mountPath: /etc/strelka
-        - name: yara-volume
+        - name: yara-rules
           mountPath: /etc/strelka/yara
       volumes:
       - name: config-volume
         configMap:
           name: {{ include "sublime-rules-engine.fullname" . }}-strelka-config
-      - name: yara-volume
-        emptyDir: {}
+      - name: yara-rules
+        configMap:
+          name: {{ include "sublime-rules-engine.fullname" . }}-yara-rules
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -189,18 +190,4 @@ spec:
       volumes:
       - name: config-volume
         configMap:
-          name: {{ include "sublime-rules-engine.fullname" . }}-strelka-config
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ include "sublime-rules-engine.fullname" . }}-persistent-storage
-  labels:
-    {{- include "sublime-rules-engine.labels" . | nindent 4 }}
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: local-path 
+          name: {{ include "sublime-rules-engine.fullname" . }}-strelka-config 

@@ -1,10 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "sublime-rules-engine.fullname" . }}-bora-lite
   labels:
     {{- include "sublime-rules-engine.labels" . | nindent 4 }}
 spec:
+  serviceName: {{ include "sublime-rules-engine.fullname" . }}-bora-lite
   replicas: 1
   selector:
     matchLabels:
@@ -30,9 +31,9 @@ spec:
             done
             MANTIS_POD_NAME=$(kubectl get pods -l app.kubernetes.io/name={{ include "sublime-rules-engine.name" . }}-mantis -o jsonpath='{.items[0].metadata.name}')
             echo "Mantis pod found: $MANTIS_POD_NAME. Waiting for migrations to complete..."
-            until kubectl logs $MANTIS_POD_NAME | grep -q "Non-blocking migrations are up to date"; do
+            until kubectl logs $MANTIS_POD_NAME | grep -q "Non-blocking migrations are up to date."; do
               echo "Migrations not complete yet, waiting..."
-              sleep 5
+              sleep 15
             done
             echo "Mantis migrations are complete. Starting bora-lite."
       containers:
@@ -52,7 +53,12 @@ spec:
         volumeMounts:
         - name: persistent-storage
           mountPath: /data
-      volumes:
-        - name: persistent-storage
-          persistentVolumeClaim:
-            claimName: {{ include "sublime-rules-engine.fullname" . }}-persistent-storage 
+  volumeClaimTemplates:
+  - metadata:
+      name: persistent-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "local-path"
+      resources:
+        requests:
+          storage: 10Gi 

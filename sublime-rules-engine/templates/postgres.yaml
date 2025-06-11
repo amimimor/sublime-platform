@@ -1,10 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "sublime-rules-engine.fullname" . }}-postgres
   labels:
     {{- include "sublime-rules-engine.labels" . | nindent 4 }}
 spec:
+  serviceName: {{ include "sublime-rules-engine.fullname" . }}-postgres
   replicas: 1
   selector:
     matchLabels:
@@ -42,10 +43,14 @@ spec:
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
-      volumes:
-        - name: postgres-storage
-          persistentVolumeClaim:
-            claimName: {{ include "sublime-rules-engine.fullname" . }}-postgres
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.storage }}
 ---
 apiVersion: v1
 kind: Service
