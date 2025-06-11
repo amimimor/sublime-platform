@@ -59,6 +59,16 @@ data:
       # Location of Yara rule files
       # Default: /etc/strelka/yara/
       yara: /etc/strelka/yara/
+  scan_yara.yaml: |
+    scanners:
+      ScanYara:
+        enabled: True
+  tastes.yaml: |
+    tastes:
+      - mime:
+          - text/plain
+        scanners:
+          - ScanYara
   manager.yaml: |
     coordinator:
       addr: '{{ include "sublime-rules-engine.fullname" . }}-redis:{{ .Values.redis.port }}'

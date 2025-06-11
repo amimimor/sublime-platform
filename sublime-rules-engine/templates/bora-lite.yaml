@@ -20,18 +20,24 @@ spec:
       initContainers:
       - name: wait-for-mantis
         image: bitnami/kubectl:latest
+        env:
+        - name: MANTIS_POD_LABEL
+          value: "{{ include "sublime-rules-engine.name" . }}-mantis"
         command:
           - /bin/sh
           - -c
           - |
             echo "Waiting for mantis pod to be ready..."
-            while ! kubectl get pods -l app.kubernetes.io/name={{ include "sublime-rules-engine.name" . }}-mantis -o jsonpath='{.items[0].metadata.name}' > /dev/null 2>&1; do
-              echo "Mantis pod not found yet, waiting..."
-              sleep 5
+            MANTIS_POD_NAME=""
+            while [ -z "$MANTIS_POD_NAME" ]; do
+              MANTIS_POD_NAME=$(kubectl get pods -l app.kubernetes.io/name=$MANTIS_POD_LABEL -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+              if [ -z "$MANTIS_POD_NAME" ]; then
+                echo "Mantis pod not found yet, waiting..."
+                sleep 5
+              fi
             done
-            MANTIS_POD_NAME=$(kubectl get pods -l app.kubernetes.io/name={{ include "sublime-rules-engine.name" . }}-mantis -o jsonpath='{.items[0].metadata.name}')
             echo "Mantis pod found: $MANTIS_POD_NAME. Waiting for migrations to complete..."
-            until kubectl logs $MANTIS_POD_NAME | grep -q "Non-blocking migrations are up to date."; do
+            until kubectl logs $MANTIS_POD_NAME | grep -q "Blocking migrations are up to date."; do
               echo "Migrations not complete yet, waiting..."
               sleep 15
             done
