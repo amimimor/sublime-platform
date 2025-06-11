@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sublime-rules-engine.fullname" . }}-bora-lite
+  labels:
+    {{- include "sublime-rules-engine.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "sublime-rules-engine.name" . }}-bora-lite
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "sublime-rules-engine.name" . }}-bora-lite
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      initContainers:
+      - name: wait-for-mantis
+        image: bitnami/kubectl:latest
+        command:
+          - /bin/sh
+          - -c
+          - |
+            MANTIS_POD_NAME=$(kubectl get pods -l app.kubernetes.io/name={{ include "sublime-rules-engine.name" . }}-mantis -o jsonpath='{.items[0].metadata.name}')
+            kubectl logs $MANTIS_POD_NAME -f | grep -q "Non-blocking migrations are up to date"
+      containers:
+      - name: bora-lite
+        image: "{{ .Values.image.bora_lite }}"
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - secretRef:
+            name: {{ include "sublime-rules-engine.fullname" . }}
+        env:
+        - name: POSTGRES_HOST
+          value: {{ include "sublime-rules-engine.fullname" . }}-postgres
+        - name: DB_RUN_MIGRATIONS
+          value: "false"
+        - name: PERSISTENT_STORAGE
+          value: "/data"
+        volumeMounts:
+        - name: persistent-storage
+          mountPath: /data
+      volumes:
+        - name: persistent-storage
+          persistentVolumeClaim:
+            claimName: {{ include "sublime-rules-engine.fullname" . }}-persistent-storage 

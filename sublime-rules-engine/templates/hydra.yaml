@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sublime-rules-engine.fullname" . }}-hydra
+  labels:
+    {{- include "sublime-rules-engine.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "sublime-rules-engine.name" . }}-hydra
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "sublime-rules-engine.name" . }}-hydra
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: hydra
+        image: "{{ .Values.image.hydra }}"
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - secretRef:
+            name: {{ include "sublime-rules-engine.fullname" . }}
+        env:
+        - name: HYDRA_POSTGRES_HOST
+          value: {{ include "sublime-rules-engine.fullname" . }}-postgres
+        - name: S3_HOST
+          value: {{ include "sublime-rules-engine.fullname" . }}-s3
+        ports:
+        - name: http
+          containerPort: 8000 

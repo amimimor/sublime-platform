@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sublime-rules-engine.fullname" . }}-mantis
+  labels:
+    {{- include "sublime-rules-engine.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "sublime-rules-engine.name" . }}-mantis
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "sublime-rules-engine.name" . }}-mantis
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: mantis
+        image: "{{ .Values.image.mantis }}"
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - secretRef:
+            name: {{ include "sublime-rules-engine.fullname" . }}
+        env:
+        - name: POSTGRES_HOST
+          value: {{ include "sublime-rules-engine.fullname" . }}-postgres
+        - name: S3_HOST
+          value: {{ include "sublime-rules-engine.fullname" . }}-s3
+        - name: S3_BUCKET
+          value: {{ .Values.s3.bucket }}
+        - name: STRELKA_HOST
+          value: {{ include "sublime-rules-engine.fullname" . }}-strelka-frontend
+        - name: HYDRA_HOST
+          value: {{ include "sublime-rules-engine.fullname" . }}-hydra
+        - name: PERSISTENT_STORAGE
+          value: "/data"
+        volumeMounts:
+        - name: persistent-storage
+          mountPath: /data
+      volumes:
+        - name: persistent-storage
+          persistentVolumeClaim:
+            claimName: {{ include "sublime-rules-engine.fullname" . }}-persistent-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sublime-rules-engine.fullname" . }}
+  labels:
+    {{- include "sublime-rules-engine.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ include "sublime-rules-engine.name" . }}-mantis
+    app.kubernetes.io/instance: {{ .Release.Name }} 

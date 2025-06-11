@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  mantis: sublimesec/mantis:1.64
+  bora_lite: sublimesec/bora-lite:1.64
+  postgres: postgres:13.2
+  redis: redis:6.2
+  strelka_frontend: sublimesec/strelka-frontend:0.3
+  strelka_backend: sublimesec/strelka-backend:0.3
+  strelka_manager: sublimesec/strelka-manager:0.3
+  strelka_coordinator: redis:alpine
+  s3: minio/minio
+  mc: minio/mc
+  hydra: sublimesec/hydra-cpu:1.1
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8000
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+postgresql:
+  username: sublime
+  password: "password"
+  database: mantis
+  storage: 10Gi
+
+redis:
+  port: 6379
+
+s3:
+  accessKeyId: "accesskey"
+  secretAccessKey: "secretkey"
+  bucket: email-screenshots
+  storage: 10Gi
+
+strelka:
+  backendReplicas: 2
+
+persistentStorage:
+  size: 1Gi
+
+sublime:
+  secretKey: "a-very-secret-key-that-should-be-changed"
+  jwtSecret: "another-super-secret-key"
+  postgresEncryptionKey: "a-third-secret-key-for-postgres"
