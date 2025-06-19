@@ -4,7 +4,12 @@
 
 # 1. Create a test file
 echo "Creating test file..."
-echo "hello world" > test.txt
+cat << EOF > test_file.txt
+This file contains the magic string: Hello, world!
+
+hello world
+EOF
+EOF > test.txt
 
 # 2. Get the name of the strelka-frontend pod
 echo "Finding strelka-frontend pod..."
@@ -27,11 +32,11 @@ sleep 3
 
 # 4. Submit the file using curl
 echo "Submitting file for scanning..."
-curl --http0.9 -X POST --data-binary @test.txt http://127.0.0.1:56564
+curl -vvv -o result.txt --http0.9 --data-binary @test_file.txt http://127.0.0.1:56564
 
 # 5. Clean up
 echo "Cleaning up..."
 kill $PORT_FORWARD_PID
-rm test.txt
+rm test_file.txt
 
 echo "Scan submission complete." 
