@@ -21,11 +21,11 @@ data:
       console:
         class: logging.StreamHandler
         formatter: default
-        level: INFO
+        level: DEBUG
     root:
       handlers:
         - console
-      level: INFO
+      level: DEBUG
   settings.yaml: |
     limits:
       scan: 1200
@@ -69,6 +69,28 @@ data:
           - text/plain
         scanners:
           - ScanYara
+  backend.yaml: |
+    version: 1
+    logging_cfg: /etc/strelka/logging.yaml
+    
+    limits:
+      max_files: 5000
+      time_to_live: 900
+      max_depth: 10
+      distribution: 1200
+      scanner: 150
+    
+    coordinator:
+      addr: '{{ include "sublime-rules-engine.fullname" . }}-redis:{{ .Values.redis.port }}'
+      db: 0
+    
+    tasting:
+      yara_rules: /etc/strelka/yara/
+    
+    scanners:
+      - flavor: "*"
+        scanner: ScanYara
+        priority: 5
   manager.yaml: |
     coordinator:
       addr: '{{ include "sublime-rules-engine.fullname" . }}-redis:{{ .Values.redis.port }}'
@@ -76,12 +98,20 @@ data:
       pool: 100
       read: 10s
   frontend.yaml: |
+    version: 1
+    logging_cfg: /etc/strelka/logging.yaml
+    
     server: "0.0.0.0:56564"
+    
     coordinator:
       addr: '{{ include "sublime-rules-engine.fullname" . }}-redis:{{ .Values.redis.port }}'
       db: 0
       pool: 100
       read: 10s
+    
+    response:
+      timeout: 60
+      log: /dev/stdout
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -104,7 +134,7 @@ spec:
       containers:
       - name: strelka-backend
         image: "{{ .Values.image.strelka_backend }}"
-        command: ["/bin/sh", "-c", "trap : TERM INT; sleep infinity & wait"]
+        command: ["strelka-backend", "--worker-config", "/etc/strelka/backend.yaml"]
         envFrom:
         - secretRef:
             name: {{ include "sublime-rules-engine.fullname" . }}
@@ -114,6 +144,10 @@ spec:
           mountPath: /etc/strelka
         - name: yara-rules
           mountPath: /etc/strelka/yara
+        - name: scanners-config
+          mountPath: /etc/strelka/scanners
+        - name: tastes-config
+          mountPath: /etc/strelka/tastes
       volumes:
       - name: config-volume
         configMap:
@@ -121,6 +155,18 @@ spec:
       - name: yara-rules
         configMap:
           name: {{ include "sublime-rules-engine.fullname" . }}-yara-rules
+      - name: scanners-config
+        configMap:
+          name: {{ include "sublime-rules-engine.fullname" . }}-strelka-config
+          items:
+          - key: scan_yara.yaml
+            path: scan_yara.yaml
+      - name: tastes-config
+        configMap:
+          name: {{ include "sublime-rules-engine.fullname" . }}-strelka-config
+          items:
+          - key: tastes.yaml
+            path: tastes.yaml
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -143,6 +189,7 @@ spec:
       containers:
       - name: strelka-frontend
         image: "{{ .Values.image.strelka_frontend }}"
+        command: ["strelka-frontend", "/etc/strelka/frontend.yaml"]
         imagePullPolicy: IfNotPresent
         ports:
         - name: frontend
@@ -150,10 +197,31 @@ spec:
         volumeMounts:
         - name: config-volume
           mountPath: /etc/strelka
+        - name: yara-rules
+          mountPath: /etc/strelka/yara
+        - name: scanners-config
+          mountPath: /etc/strelka/scanners
+        - name: tastes-config
+          mountPath: /etc/strelka/tastes
       volumes:
       - name: config-volume
         configMap:
           name: {{ include "sublime-rules-engine.fullname" . }}-strelka-config
+      - name: yara-rules
+        configMap:
+          name: {{ include "sublime-rules-engine.fullname" . }}-yara-rules
+      - name: scanners-config
+        configMap:
+          name: {{ include "sublime-rules-engine.fullname" . }}-strelka-config
+          items:
+          - key: scan_yara.yaml
+            path: scan_yara.yaml
+      - name: tastes-config
+        configMap:
+          name: {{ include "sublime-rules-engine.fullname" . }}-strelka-config
+          items:
+          - key: tastes.yaml
+            path: tastes.yaml
 ---
 apiVersion: v1
 kind: Service
@@ -193,6 +261,7 @@ spec:
       containers:
       - name: strelka-manager
         image: "{{ .Values.image.strelka_manager }}"
+        command: ["strelka-manager", "/etc/strelka/manager.yaml"]
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: config-volume
